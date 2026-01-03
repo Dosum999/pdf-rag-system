@@ -127,7 +127,6 @@ pdf-rag-system/
 필수:
 - **Docker Desktop** (최신 버전)
 - **Docker Compose** v2.0+
-- uploads 하위 폴더 생성
 
 선택 (로컬 개발 시):
 - Go 1.21+
