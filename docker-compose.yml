@@ -1,0 +1,100 @@
+version: '3.8'
+
+services:
+  # PostgreSQL with pgvector
+  postgres:
+    image: ankane/pgvector:latest
+    container_name: pdf-rag-postgres
+    environment:
+      POSTGRES_DB: pdf_rag_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/migrations:/docker-entrypoint-initdb.d
+    networks:
+      - pdf-rag-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Python Docreader gRPC Server
+  docreader:
+    build:
+      context: ./docreader
+      dockerfile: Dockerfile
+    container_name: pdf-rag-docreader
+    ports:
+      - "50051:50051"
+    environment:
+      GRPC_PORT: 50051
+    networks:
+      - pdf-rag-network
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 50051 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  # Go Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: pdf-rag-backend
+    ports:
+      - "8080:8080"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: pdf_rag_db
+      DOCREADER_HOST: docreader
+      DOCREADER_PORT: 50051
+      SERVER_PORT: 8080
+    env_file:
+      - .env
+    volumes:
+      - ./uploads:/app/uploads
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      docreader:
+        condition: service_healthy
+    networks:
+      - pdf-rag-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Vue Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: pdf-rag-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      VITE_API_BASE_URL: http://localhost:8080
+    depends_on:
+      - backend
+    networks:
+      - pdf-rag-network
+
+volumes:
+  postgres_data:
+
+networks:
+  pdf-rag-network:
+    driver: bridge

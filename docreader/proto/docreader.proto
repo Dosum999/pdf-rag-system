@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package docreader;
+
+option go_package = "github.com/pdf-rag-system/backend/pkg/proto";
+
+service DocReader {
+  rpc ParsePDF(ParseRequest) returns (ParseResponse) {}
+}
+
+message ParseRequest {
+  bytes file_content = 1;
+  string filename = 2;
+  ChunkConfig chunk_config = 3;
+}
+
+message ChunkConfig {
+  int32 chunk_size = 1;
+  int32 chunk_overlap = 2;
+}
+
+message BoundingBox {
+  float x1 = 1;
+  float y1 = 2;
+  float x2 = 3;
+  float y2 = 4;
+}
+
+message Chunk {
+  string content = 1;
+  int32 chunk_index = 2;
+  int32 page_number = 3;
+  int32 start_pos = 4;
+  int32 end_pos = 5;
+  BoundingBox bbox = 6;
+}
+
+message ParseResponse {
+  repeated Chunk chunks = 1;
+  int32 total_pages = 2;
+  string error = 3;
+}
